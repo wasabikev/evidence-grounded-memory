@@ -1,6 +1,6 @@
 # evidence-grounded-memory
 
-**A reference implementation of agent memory as a living evidentiary record — not a vector database.**
+**A reference implementation of agent memory as a living evidentiary record — where vector search is derived retrieval infrastructure, not the memory substrate.**
 
 Durable, human-readable markdown is the source of truth. Keyword and semantic search are *derived,
 disposable* views over it. Every fact carries provenance and an authority tier, and a fact's standing
@@ -17,7 +17,7 @@ implementation. It is a *demonstration of the architecture*, not a copy of the p
 
 | | |
 |---|---|
-| **Thesis** | Agent memory is an evidentiary record with a changelog, not a key-value store or a vector index. |
+| **Thesis** | Agent memory is an evidentiary record with a changelog — not a key-value store, and not reducible to its vector index (vectors are a derived retrieval path, not the substrate). |
 | **Source of truth** | Human-readable markdown topic files (`topics/*.md`, H2-sectioned). Every index is derived from them and disposable. |
 | **Retrieval** | Dual-path: FTS5 keyword + semantic vector search, run in parallel and **merged**. |
 | **Injection** | Split token budget (shared pool + separate INDEX cap) so no single topic crowds out cross-domain context. |
