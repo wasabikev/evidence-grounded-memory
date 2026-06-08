@@ -1,0 +1,154 @@
+"""End-to-end demo: ingest -> tag -> recall -> inject -> re-grade -> consolidate.
+
+Domain: home renovation / permitting (spans all 7 authority tiers). The runnable proof that the pieces
+compose. It walks one scenario through the full pipeline:
+
+  1. Ingest the committed corpus (``examples/corpus``) — markdown topic files with inline provenance tags
+     spanning building code (A), permit guidance (B), a professional standard (C), a contractor quote
+     (D), aggregated reviews (E), homeowner statements (F), and an AI inference (G).
+  2. Build the derived indexes (FTS5 keyword + semantic vectors) over the markdown source of truth.
+  3. Recall: run dual-path retrieval for a query and inject the split-budget context block.
+  4. Re-grade (synchronous, #5): promote a provisional homeowner statement when official guidance
+     corroborates it, and supersede an AI inference when the contractor quote contradicts it — both
+     recorded non-destructively in the markdown.
+  5. Consolidate (asynchronous, #6): the scheduled backstop dedups a duplicate bullet and re-tiers an
+     inline tag the runtime got wrong, reconciling against the sources registry.
+
+Run:  python examples/demo.py
+"""
+
+from __future__ import annotations
+
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+
+# Make the repo root importable when run as `python examples/demo.py`.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+# Provenance tags carry the middle dot (·) and the output uses ≤; force UTF-8 so the demo prints on
+# consoles whose default encoding (e.g. Windows cp1252) can't represent them.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
+from evidence.sources import SourcesRegistry  # noqa: E402
+from memory.consolidator import consolidate  # noqa: E402
+from memory.injector import MemoryBudget, inject, recall  # noqa: E402
+from memory.semantic_index import SemanticIndex  # noqa: E402
+from memory.store import MemoryStore  # noqa: E402
+
+CORPUS = Path(__file__).resolve().parent / "corpus"
+
+
+def _rule(title: str) -> None:
+    print("\n" + "=" * 78)
+    print(title)
+    print("=" * 78)
+
+
+def _setup_workspace() -> Path:
+    """Copy the committed corpus into a throwaway workspace so re-grading can mutate it freely."""
+    ws = Path(tempfile.mkdtemp(prefix="egm_demo_"))
+    shutil.copytree(CORPUS / "topics", ws / "topics")
+    shutil.copy(CORPUS / "sources.jsonl", ws / "sources.jsonl")
+    return ws
+
+
+def _build(ws: Path) -> tuple[MemoryStore, SemanticIndex, SourcesRegistry]:
+    store = MemoryStore(ws)
+    store.rebuild_index()
+    semantic = SemanticIndex()
+    semantic.rebuild(store.iter_sections())
+    registry = SourcesRegistry(ws / "sources.jsonl")
+    return store, semantic, registry
+
+
+def main() -> None:
+    ws = _setup_workspace()
+    print(f"workspace: {ws}")
+    store, semantic, registry = _build(ws)
+
+    # --- 1. dual-path recall + split-budget injection (#1, #2, #7) --------------------------------
+    _rule("1. DUAL-PATH RECALL + SPLIT-BUDGET INJECTION")
+    query = "permit needed for a new deck circuit (code R105.2)"
+    print(f"query: {query!r}\n")
+
+    print("merged hits (which path retrieved each section):")
+    for hit in recall(query, store, semantic):
+        via = "+".join(sorted(hit.paths))
+        print(f"  {hit.fused_score:.4f}  [{via:16}]  {hit.section.id}")
+
+    print("\ninjected context block (what the model would receive):\n")
+    print(inject(query, store, semantic, MemoryBudget()))
+
+    # --- 2. temporal re-grading, synchronous path (#5) -------------------------------------------
+    _rule("2. TEMPORAL RE-GRADING (synchronous, in-conversation)")
+
+    print("BEFORE — permits / Deck permits:\n")
+    print(store.get_section("permits", "Deck permits").body)
+
+    # Promotion: the homeowner's provisional 'two weeks' estimate (F) is corroborated by the permit
+    # office guidance (B). Effective trust rises; history is annotated, not rewritten.
+    store.confirm_bullet("permits", "Deck permits", "about two weeks", ref="e041")
+
+    print("\nAFTER promotion (homeowner estimate corroborated by official guidance e041):\n")
+    print(store.get_section("permits", "Deck permits").body)
+
+    print("\nBEFORE — materials / Decking boards:\n")
+    print(store.get_section("materials", "Decking boards").body)
+
+    # Supersession: the AI inference (G) that composite is cheaper is contradicted by the actual
+    # contractor quote (D). Recorded bidirectionally and non-destructively.
+    store.supersede_bullet(
+        "materials",
+        "Decking boards",
+        old_needle="composite likely has the lower ten-year cost",
+        new_bullet="Using Northwood's actual cedar quote, cedar has the lower ten-year cost for this project. [doc:e060·D]",
+        ref="e060",
+        date="2026-06-05",
+    )
+    store.rebuild_index()
+    semantic.rebuild(store.iter_sections())
+
+    print("\nAFTER supersession (AI inference contradicted by contractor quote e060 — original kept):\n")
+    print(store.get_section("materials", "Decking boards").body)
+
+    # --- 3. consolidation, asynchronous backstop (#6) --------------------------------------------
+    _rule("3. CONSOLIDATION (asynchronous backstop: dedup + re-tier)")
+
+    # Simulate two things the runtime left behind:
+    #  (a) a duplicate bullet written by a second extraction pass, and
+    #  (b) a bullet the runtime mis-tagged ·C when the registry grades e041 as ·B.
+    elec = store.read_topic("permits")
+    elec = elec.replace(
+        "- The inspector wants the panel schedule labeled before the rough-in inspection. [doc:e041·B]\n",
+        "- The inspector wants the panel schedule labeled before the rough-in inspection. [doc:e041·B]\n"
+        "- The inspector wants the panel schedule labeled before the rough-in inspection. [doc:e041·B]\n"
+        "- Service upgrades over 200 amps need a separate utility coordination step. [doc:e041·C]\n",
+    )
+    store.write_topic("permits", elec)
+    store.rebuild_index()
+
+    print("BEFORE — permits / Electrical permits (note duplicate + mis-tiered ·C):\n")
+    print(store.get_section("permits", "Electrical permits").body)
+
+    report = consolidate(store, registry)
+
+    print("\nconsolidation report:")
+    print(f"  deduped : {report.deduped}")
+    print(f"  retiered: {report.retiered}")
+
+    print("\nAFTER consolidation:\n")
+    print(store.get_section("permits", "Electrical permits").body)
+
+    # Idempotence: a second pass finds nothing left to do.
+    second = consolidate(store, registry)
+    print(f"\nsecond pass changed anything? {second.changed}  (expected: False)")
+
+    _rule("DONE")
+    print(f"inspect the mutated workspace at: {ws}")
+
+
+if __name__ == "__main__":
+    main()

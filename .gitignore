@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Derived indexes (rebuilt from the markdown source of truth)
+*.db
+*.sqlite3
+
+# Env / secrets
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# PRIVATE coordination artifact — NEVER publish. Enumerates the publish/withhold
+# boundary and the in-house "moat". Do not remove this entry or force-add the file.
+PORTFOLIO_WORKING.md
+
+# Draft / seed material for future blog posts & talks — kept private until polished.
+docs/notes/
