@@ -1,5 +1,9 @@
 # evidence-grounded-memory
 
+[![tests](https://github.com/wasabikev/evidence-grounded-memory/actions/workflows/tests.yml/badge.svg)](https://github.com/wasabikev/evidence-grounded-memory/actions/workflows/tests.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)
+
 **A reference implementation of agent memory as a living evidentiary record — where vector search is retrieval infrastructure, not the memory substrate.**
 
 Durable, human-readable markdown is the source of truth. Keyword and semantic search are *derived,
@@ -154,3 +158,10 @@ Runs on Python 3.9+ with **zero third-party dependencies** (stdlib `sqlite3` FTS
 python examples/demo.py                          # full pipeline, end to end
 python -m unittest discover -s tests -p "test_*.py"   # behavior-demonstrating tests
 ```
+
+---
+
+## License
+
+[Apache License 2.0](LICENSE). Permissive reuse with an explicit patent grant; the temporal re-grading
+mechanism is published deliberately as prior art.
