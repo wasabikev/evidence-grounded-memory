@@ -1,6 +1,6 @@
 # evidence-grounded-memory
 
-**A reference implementation of agent memory as a living evidentiary record — where vector search is derived retrieval infrastructure, not the memory substrate.**
+**A reference implementation of agent memory as a living evidentiary record — where vector search is retrieval infrastructure, not the memory substrate.**
 
 Durable, human-readable markdown is the source of truth. Keyword and semantic search are *derived,
 disposable* views over it. Every fact carries provenance and an authority tier, and a fact's standing
