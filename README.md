@@ -50,9 +50,9 @@ specific, nameable way.
 | 6 | **Scheduled consolidation** | Keep the corpus coherent without manual curation | Left alone, a memory store drifts into duplication, contradiction, and stale confidence. A non-destructive, idempotent, budget-aware pass backstops runtime and re-grades the corpus. |
 | 7 | **Section-level indexing** | Inject just the relevant *section*, not a whole topic | Document-level indexing forces a choice between injecting an entire topic (blows the budget) or nothing. H2-sectioned markdown indexed at section granularity makes budget-aware injection possible. |
 
-Decisions **#1** and **#5** carry the strongest signal. The dual-path *merge* is the clearest piece of
-systems thinking in the retrieval layer; **temporal re-grading** is the part the vector-database framing
-has no answer for at all.
+Decisions **#1** and **#5** are where this design departs most from conventional agent memory. The
+dual-path *merge* — not either retrieval path alone — is what makes recall work; **temporal re-grading**
+models something vector search leaves out entirely: a fact's standing changing as evidence accumulates.
 
 The markdown topic files are the source of truth; both indexes are derived and disposable, and the
 **merge** — not either path alone — is the point:
@@ -111,7 +111,7 @@ evidence-grounded-memory/
 ├── memory/                    ← runnable retrieval core
 │   ├── store.py               ← file-first store + FTS5 section index
 │   ├── semantic_index.py      ← vector search layer
-│   ├── injector.py            ← split-budget injection + dual-path merge (centerpiece)
+│   ├── injector.py            ← split-budget injection + dual-path merge
 │   └── consolidator.py        ← slim consolidator: dedup + re-tier
 ├── evidence/                  ← the authority / provenance layer
 │   ├── tiers.py               ← 7-tier / 14-category vocabulary + resolver
@@ -132,7 +132,7 @@ for the provenance layer.
   cleanly, in a neutral domain, with runnable code for the core and described-only treatment of the
   heavier periphery.
 - **It is not** a copy of production code, and it deliberately withholds the *calibration* — the
-  domain-tuned recognition cues, production prompts, thresholds, and ranking weights. Those are the moat;
+  domain-tuned recognition cues, production prompts, thresholds, and ranking weights. Those stay in-house;
   the architecture and its rationale are the asset. See the publication boundary in
   [docs/architecture.md](docs/architecture.md#publication-boundary).
 
@@ -144,7 +144,7 @@ for the provenance layer.
 - [x] Evidence layer (`tiers.py`, `sources.py`)
 - [x] File-first store + section-level FTS5 (`store.py`)
 - [x] Semantic index (`semantic_index.py`)
-- [x] Split-budget dual-path injector (`injector.py`) — the centerpiece
+- [x] Split-budget dual-path injector (`injector.py`)
 - [x] Slim consolidator: dedup + re-tier (`consolidator.py`)
 - [x] End-to-end demo (`examples/demo.py`) + tests
 

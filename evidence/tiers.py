@@ -7,7 +7,7 @@ inline tag whose tier drives conflict resolution and verification flagging.
 Publication boundary
 --------------------
 The tier/category *skeleton* below is published. The domain-calibrated **recognition cues** that
-classify a raw source into one of these categories (the bit tuned over real engagements) are the moat
+classify a raw source into one of these categories (the bit tuned over real engagements) stay in-house
 and are intentionally absent — this module maps a *known* category to its tier; it does not infer the
 category from raw text. See docs/architecture.md#publication-boundary.
 """
@@ -29,7 +29,7 @@ TIER_LABELS: dict[str, str] = {
 }
 
 # The published 14-category skeleton: category -> tier. The *recognition cues* that would map raw
-# source text onto one of these categories are withheld (the moat); only the mapping ships.
+# source text onto one of these categories are withheld; only the mapping ships.
 CATEGORY_TIERS: dict[str, str] = {
     # A — authoritative regulation
     "regulation": "A",

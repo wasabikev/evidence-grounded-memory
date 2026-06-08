@@ -42,8 +42,9 @@ authority model that governs how conflicts resolve and when output is flagged fo
 
 ### 4. Authority is temporal, not fixed at write time (temporal authority)
 
-This is the part the vector-DB framing has no answer for. Facts arrive at different times from sources of
-different strength, and their standing *changes as evidence accumulates*. A fact can enter the store as a
+Vector search can surface an old fact, but it has no way to represent that the fact's standing has
+changed. Facts arrive at different times from sources of different strength, and their standing
+*changes as evidence accumulates*. A fact can enter the store as a
 low-tier user statement or AI inference, then be **promoted** when a higher-authority document later
 corroborates it — or **superseded** when an authoritative source contradicts it. Memory is therefore a
 *living evidentiary record*: provisional on entry, continuously re-graded, and held coherent over time by
@@ -77,7 +78,7 @@ time — promoting corroborated facts, marking superseded ones, deduplicating, a
 
 FTS5 keyword index and semantic vector search run in parallel, then a merge/ranking layer combines them.
 Pure semantic search misses exact-match technical terms; pure keyword search misses conceptual proximity.
-The interview point is the *merge*, not either path alone.
+The merge — not either path alone — is the point.
 
 ```mermaid
 flowchart TD
@@ -144,8 +145,8 @@ bullets resolve back to this registry for full metadata (label, category, tier, 
 
 ### 5. Temporal authority — promotion & supersession
 
-**The decision the vector-DB framing has no analog for, and the strongest single signal of original
-systems thinking.** Authority is not stamped once at write time; a fact's standing evolves as evidence
+**The part conventional vector-memory designs usually do not model.** Authority is not stamped once at
+write time; a fact's standing evolves as evidence
 accumulates. The system makes that evolution *first-class and auditable* rather than destructive:
 
 - **Provisional on entry.** A fact written from a user statement (`[user]`, Tier F) or model inference
@@ -186,7 +187,7 @@ flowchart TD
 
 (Diagram: [diagrams/tier-flow.md](diagrams/tier-flow.md).)
 
-The interview point: *memory is an evidentiary record with a changelog, not a key-value store.* Trust is
+Stated plainly: *memory is an evidentiary record with a changelog, not a key-value store.* Trust is
 a function of corroboration over time, and the system encodes that as durable, human-readable annotations
 rather than silent overwrites. Decisions #3 (tiers) and #4 (sources) supply the vocabulary; this decision
 is what makes them *dynamic*. Decision #6 is one of its two execution paths.
@@ -217,8 +218,8 @@ This repo distinguishes **sanitization** (mechanically scrubbing client/infra/te
 
 **Governing principle:** *publish the what and why; withhold the calibration.* The architecture and its
 rationale are the asset and cost little to share. The **tuning** — vocabularies calibrated over real
-engagements, production prompts, thresholds, ranking weights, and eval results — is the moat. A reference
-implementation should *demonstrate* each decision, not ship the production-tuned artifact.
+engagements, production prompts, thresholds, ranking weights, and eval results — is what stays in-house.
+A reference implementation should *demonstrate* each decision, not ship the production-tuned artifact.
 
 **Standing rules:**
 
@@ -226,10 +227,10 @@ implementation should *demonstrate* each decision, not ship the production-tuned
   reference modules use minimal illustrative prompts.
 - **No eval results or tuning data.** No benchmark numbers, thresholds chosen from real data, or ranking
   weights presented as production values (illustrative defaults are fine, labeled as such).
-- **The repo is a hook, not a spec.** When in doubt, publish the principle and a clean demo; leave the
-  depth for the interview.
+- **The repo is a hook, not a spec.** When in doubt, publish the principle and a clean demo; keep the
+  deeper detail out of the repo.
 
-| # | Decision | Publish (the asset) | Withhold (the moat) | Sensitivity |
+| # | Decision | Publish (the asset) | Withhold (kept in-house) | Sensitivity |
 |---|---|---|---|---|
 | 1 | Dual-path recall | The merge concept + a working keyword/semantic merge in the neutral domain | Production ranking weights / score-fusion tuned on real data | Low |
 | 2 | Split-budget injection | The split principle + partition rationale; illustrative token allocations | — (defaults are re-derivable) | Low |
@@ -239,7 +240,7 @@ implementation should *demonstrate* each decision, not ship the production-tuned
 | 6 | Scheduled consolidation | The slim dedup + re-tier loop; non-destructive / idempotent / budget-aware principles | Production merge prompts + LLM-judgment heuristics; the full sub-task set | Med |
 | 7 | Section-level indexing | Fully — standard technique, no calibration to protect | — | Low |
 
-The two **High** rows (#3 cue table, #5 mechanism) are the crux of "are we publishing too much?" The
-handling: publish the principle and shape at full strength (they are the strongest signals); withhold the
-calibrated cue table and the production prompts/thresholds. Publishing #5 is treated as deliberate,
+The two **High** rows (#3 cue table, #5 mechanism) are where "are we publishing too much?" actually
+bites. The handling: publish the principle and shape in full; withhold the calibrated cue table and the
+production prompts/thresholds. Publishing #5 is treated as deliberate,
 irreversible prior art — not a default.

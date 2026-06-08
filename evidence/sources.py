@@ -51,7 +51,7 @@ class Source:
     category: str                  # resolves to a tier via evidence.tiers.resolve_tier
     tier: str                      # A-G (authoritative copy of the tier; inline tags reconcile to it)
     effective_date: str | None = None
-    # Enrichment shape only — scoring logic is the withheld moat.
+    # Enrichment shape only — scoring logic stays in-house.
     independence: float | None = None
     recency: float | None = None
     scope_fit: float | None = None

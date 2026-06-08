@@ -1,13 +1,13 @@
-"""Split-budget context injection + dual-path merge — THE CENTERPIECE (decisions #1 merge, #2).
+"""Split-budget context injection + dual-path merge (decisions #1 merge, #2).
 
-This module carries the strongest single signal of the system's design. Two ideas combine here:
+Two ideas combine here:
 
   * **Dual-path merge (#1).** Keyword results (``MemoryStore.search_sections``) and semantic results
     (``SemanticIndex.search``) are reconciled into one ranked set. Neither path alone suffices — exact
     technical terms come from keyword, conceptual proximity from semantic — so the *merge* is the point.
     We fuse with **Reciprocal Rank Fusion (RRF)**, which combines the two *rankings* (not raw scores, so
     no cross-path score calibration is needed). Production uses tuned score-fusion weights; RRF is the
-    clean, re-derivable default published here (the weights are the withheld moat).
+    clean, re-derivable default published here (the tuned weights stay in-house).
 
   * **Split budget (#2).** The assembled context is partitioned — a shared pool for the top section
     snippets and a *separate* INDEX cap for a compressed table-of-contents — so no single topic can
