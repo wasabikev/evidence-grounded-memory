@@ -97,8 +97,9 @@ similarity, paste into the prompt. That answers one narrow question — *which t
 the query* — and treats memory as a lookup. It isn't a lookup; it's a **stack of layers**, each assuming
 the one beneath it:
 
-1. **Substrate — what *is* the memory?** A vector index is opaque and unauditable. The ground layer is
-   durable markdown topic files as the source of truth; every index is a derived, rebuildable view.
+1. **Substrate — what *is* the memory?** Durable markdown topic files are the source of truth; every
+   index is a derived, rebuildable view. This file-first substrate is auditable and editable in
+   a way an opaque index isn't.
 2. **Provenance — the foundation everything rests on.** Every fact carries where it came from and an
    authority tier. You cannot resolve conflicts or safely act on memory you can't weigh by source:
 
@@ -111,8 +112,13 @@ the one beneath it:
    accumulates, non-destructively. From the demo: an AI guess — *"composite likely has the lower ten-year
    cost `[ai]`"* — is **superseded** when the contractor's quote arrives: *"cedar has the lower ten-year
    cost `[doc:e060·D]`"*. The old belief is kept as audit history, not overwritten.
-4. **Retrieval — getting the right layer back.** Keyword and semantic search, merged, packing the relevant
-   *section* under a budget. A standard, necessary layer — not the system.
+4. **Consolidation — keeping the corpus coherent.** Left alone, memory bloats fast: duplicate
+   extractions, and contradictions pile up until recall drowns in noise. So each night a
+   pass runs to dedup, reconcile, and re-grade the corpus. Not a nicety: skip it and
+   the stack buries itself under its own volume. Dreaming is needed.
+5. **Retrieval — the right context, before inference.** Keyword and semantic search, merged, surface
+   just the memory the model needs — and inform the tool calls it makes next, which may pull more. This
+   is the harness: orchestration that lets a model deliver what it couldn't unaided.
 
 **The opinionated part:** provenance and temporal authority aren't bolted onto retrieval — they *are* the
 foundation. Most "agent memory" skips them and ships a vector index; this treats them as non-negotiable.
