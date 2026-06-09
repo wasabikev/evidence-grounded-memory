@@ -1,0 +1,15 @@
+COASTAL CONSTRUCTION FASTENER STANDARD
+Issued by the industry fastener body
+Effective: 2022-06-01
+
+Scope
+  Applies to exterior construction within one mile of a saltwater shoreline.
+
+Fastener requirements
+  Stainless steel fasteners are required for any deck near salt air.
+  Hot-dip galvanized fasteners are not sufficient in a coastal exposure zone.
+  Hidden fastener systems must use stainless components throughout.
+
+Rationale
+  Salt air accelerates corrosion of plated and galvanized fasteners, which can
+  compromise structural connections well before the end of a deck's service life.

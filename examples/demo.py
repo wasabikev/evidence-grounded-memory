@@ -32,6 +32,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
+from documents.index import DocumentIndex  # noqa: E402
+from documents.inventory import render_inventory  # noqa: E402
 from evidence.sources import SourcesRegistry  # noqa: E402
 from memory.consolidator import consolidate  # noqa: E402
 from memory.injector import MemoryBudget, inject, recall  # noqa: E402
@@ -52,6 +54,8 @@ def _setup_workspace() -> Path:
     ws = Path(tempfile.mkdtemp(prefix="egm_demo_"))
     shutil.copytree(CORPUS / "topics", ws / "topics")
     shutil.copy(CORPUS / "sources.jsonl", ws / "sources.jsonl")
+    shutil.copy(CORPUS / "documents.jsonl", ws / "documents.jsonl")
+    shutil.copytree(CORPUS / "documents", ws / "documents")
     return ws
 
 
@@ -82,8 +86,37 @@ def main() -> None:
     print("\ninjected context block (what the model would receive):\n")
     print(inject(query, store, semantic, MemoryBudget()))
 
-    # --- 2. temporal re-grading, synchronous path (#5) -------------------------------------------
-    _rule("2. TEMPORAL RE-GRADING (synchronous, in-conversation)")
+    # --- 2. document recall: passive inventory + content search (#8) ------------------------------
+    _rule("2. DOCUMENT RECALL (passive inventory + content search)")
+    doc_index = DocumentIndex.from_manifest(ws / "documents.jsonl")
+
+    money_q = "is cedar or composite cheaper over ten years for this deck"
+    print(f"query: {money_q!r}\n")
+
+    # The production failure this fixes was filename-only matching. The quote that holds the answer is
+    # named "Quote #4471" — its filename contains none of the query's content terms, so a name search
+    # misses it entirely. (This is the home-renovation analog of a confirmation PDF a name search can't find.)
+    needles = ["cedar", "composite", "ten-year", "ten year", "cost"]
+    filename_hits = [d for d in doc_index.documents() if any(n in d.filename.lower() for n in needles)]
+    print(f"filename-only search (the old behavior) -> {len(filename_hits)} hits")
+
+    # Content-aware search over filename + gist + body finds it — the same standard FTS5 retrieval as the
+    # keyword path (#1), applied to the document substrate. The decision is the substrate + its surfacing.
+    content_hits = doc_index.search(money_q)
+    print("content search (filename + gist + body):")
+    for m in content_hits:
+        print(f"  {m.relevance:7.4f}  [doc:{m.document.ref}]  {m.document.filename}")
+
+    print("\npassive 'Source documents' block the agent receives this turn:\n")
+    print(render_inventory(doc_index, money_q))
+
+    discovered = content_hits[0].document
+    print(f"\n-> discovered source: [doc:{discovered.ref}] {discovered.filename}")
+    print("   the agent can now answer 'cedar' from the document — and this is the same source that")
+    print("   drives the supersession in the next act (discovery feeds re-grading).")
+
+    # --- 3. temporal re-grading, synchronous path (#5) -------------------------------------------
+    _rule("3. TEMPORAL RE-GRADING (synchronous, in-conversation)")
 
     print("BEFORE — permits / Deck permits:\n")
     print(store.get_section("permits", "Deck permits").body)
@@ -99,13 +132,17 @@ def main() -> None:
     print(store.get_section("materials", "Decking boards").body)
 
     # Supersession: the AI inference (G) that composite is cheaper is contradicted by the actual
-    # contractor quote (D). Recorded bidirectionally and non-destructively.
+    # contractor quote (D) — the very document surfaced by the discovery act above. Recorded
+    # bidirectionally and non-destructively. The ref comes from discovery, not a hardcode: #8 feeds #5.
     store.supersede_bullet(
         "materials",
         "Decking boards",
         old_needle="composite likely has the lower ten-year cost",
-        new_bullet="Using Northwood's actual cedar quote, cedar has the lower ten-year cost for this project. [doc:e060·D]",
-        ref="e060",
+        new_bullet=(
+            f"Using Northwood's actual cedar quote, cedar has the lower ten-year cost for this "
+            f"project. [doc:{discovered.ref}·D]"
+        ),
+        ref=discovered.ref,
         date="2026-06-05",
     )
     store.rebuild_index()
@@ -114,8 +151,8 @@ def main() -> None:
     print("\nAFTER supersession (AI inference contradicted by contractor quote e060 — original kept):\n")
     print(store.get_section("materials", "Decking boards").body)
 
-    # --- 3. consolidation, asynchronous backstop (#6) --------------------------------------------
-    _rule("3. CONSOLIDATION (asynchronous backstop: dedup + re-tier)")
+    # --- 4. consolidation, asynchronous backstop (#6) --------------------------------------------
+    _rule("4. CONSOLIDATION (asynchronous backstop: dedup + re-tier)")
 
     # Simulate two things the runtime left behind:
     #  (a) a duplicate bullet written by a second extraction pass, and

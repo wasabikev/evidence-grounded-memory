@@ -27,6 +27,7 @@ implementation. It is a *demonstration of the architecture*, not a copy of the p
 | **Injection** | Split token budget (shared pool + separate INDEX cap) so no single topic crowds out cross-domain context. |
 | **Trust** | 7-tier / 14-category provenance vocabulary; every fact tagged inline (`[doc:e037·A]`, `[user]`, `[ai]`). |
 | **Temporal authority** | Facts enter *provisional*, then get promoted (`confirmed by …`) or superseded (`superseded … by …`) as evidence accumulates — non-destructively. |
+| **Source recall** | Held documents are a first-class substrate: a passive per-agent inventory + a derived content index surface a document's text, so the agent recalls and cites primary sources, not just distilled memory. |
 | **Demo domain** | Home renovation / permitting (spans all 7 tiers: building code → permit guidance → contractor docs → product reviews → homeowner statements → AI inference). |
 
 **Quickstart**
@@ -39,7 +40,7 @@ python examples/demo.py     # ingest → tag → recall → inject, end to end
 
 ---
 
-## The seven design decisions
+## The eight design decisions
 
 The table below is the spine of the repo. Each decision exists because the obvious approach fails in a
 specific, nameable way.
@@ -53,10 +54,15 @@ specific, nameable way.
 | 5 | **Temporal re-grading** (promotion & supersession) | Let a fact's trust evolve as evidence accumulates | Stamping authority once at write time is wrong: a low-tier user statement may later be corroborated by a statute, or contradicted by one. Overwriting destroys the audit trail of *what the agent believed and why it changed*. |
 | 6 | **Scheduled consolidation** | Keep the corpus coherent without manual curation | Left alone, a memory store drifts into duplication, contradiction, and stale confidence. A non-destructive, idempotent, budget-aware pass backstops runtime and re-grades the corpus. |
 | 7 | **Section-level indexing** | Inject just the relevant *section*, not a whole topic | Document-level indexing forces a choice between injecting an entire topic (blows the budget) or nothing. H2-sectioned markdown indexed at section granularity makes budget-aware injection possible. |
+| 8 | **Source-document recall** | Make held documents discoverable and content-searchable, per agent | Holding a document isn't the same as being able to use it: filename-only search misses what's in the body, and the agent can't reach for a source it doesn't know it has. A passive per-agent inventory + a derived content index let the repository surface its own primary sources. |
 
-Decisions **#1** and **#5** are where this design departs most from conventional agent memory. The
-dual-path *merge* — not either retrieval path alone — is what makes recall work; **temporal re-grading**
-models something vector search leaves out entirely: a fact's standing changing as evidence accumulates.
+**Temporal re-grading (#5)** is where this design departs most from conventional agent memory — it models
+something a vector index leaves out entirely: a fact's standing changing as evidence accumulates. It is
+reinforced by the provenance layer (**#3 / #4**) and by **source-document recall (#8)**, which lets the
+repository surface its own primary sources. The retrieval foundations — **dual-path hybrid search (#1)**
+and **section-level indexing (#7)** — are deliberately *standard* best practices, included because the
+system rests on them, not as novel contributions: hybrid keyword+semantic retrieval is table stakes here,
+and this design treats it as such.
 
 The markdown topic files are the source of truth; both indexes are derived and disposable, and the
 **merge** — not either path alone — is the point:
@@ -120,6 +126,9 @@ evidence-grounded-memory/
 ├── evidence/                  ← the authority / provenance layer
 │   ├── tiers.py               ← 7-tier / 14-category vocabulary + resolver
 │   └── sources.py             ← sources registry schema + tag parser
+├── documents/                 ← source-document recall (decision #8)
+│   ├── index.py               ← derived FTS5 index over filename + gist + body
+│   └── inventory.py           ← passive "Source documents" inventory block
 ├── examples/
 │   └── demo.py                ← end-to-end: ingest → tag → recall → inject
 └── tests/                     ← behavior-demonstrating tests
@@ -144,12 +153,13 @@ for the provenance layer.
 
 ## Roadmap
 
-- [x] Design narrative + seven decisions
+- [x] Design narrative + eight decisions
 - [x] Evidence layer (`tiers.py`, `sources.py`)
 - [x] File-first store + section-level FTS5 (`store.py`)
 - [x] Semantic index (`semantic_index.py`)
 - [x] Split-budget dual-path injector (`injector.py`)
 - [x] Slim consolidator: dedup + re-tier (`consolidator.py`)
+- [x] Source-document recall: per-agent FTS5 document index + passive inventory (`documents/`)
 - [x] End-to-end demo (`examples/demo.py`) + tests
 
 Runs on Python 3.9+ with **zero third-party dependencies** (stdlib `sqlite3` FTS5 + a local embedder).

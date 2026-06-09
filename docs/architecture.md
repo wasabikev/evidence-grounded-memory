@@ -5,7 +5,7 @@
 
 ## Purpose
 
-The long-form design narrative behind the reference implementation: the problem framing, the seven
+The long-form design narrative behind the reference implementation: the problem framing, the eight
 design decisions, and the boundary between what this repo publishes and what it deliberately withholds.
 The [repo README](../README.md) is the compressed read; this is the depth.
 
@@ -51,7 +51,8 @@ corroborates it — or **superseded** when an authoritative source contradicts i
 a scheduled consolidation pass that dedups, reconciles, and re-tiers. Without that, the corpus drifts
 into contradiction and stale confidence.
 
-These four problems map directly onto the seven design decisions below.
+These four problems map directly onto decisions #1–#7 below. An eighth decision — **source-document
+recall** — extends the same file-first thesis to a second substrate (held documents), and is covered in §8.
 
 ---
 
@@ -70,6 +71,10 @@ call, within a fixed, partitioned token budget.
 **Scheduled consolidation.** Because authority is temporal, a scheduled pass re-grades the corpus over
 time — promoting corroborated facts, marking superseded ones, deduplicating, and keeping tiers honest.
 
+**Source-document recall.** Held documents are a second substrate alongside topic memory: a passive
+per-agent inventory plus a derived content index make a document's text discoverable and recallable, so the
+repository can surface its own primary sources.
+
 ---
 
 ## Key design decisions
@@ -79,6 +84,12 @@ time — promoting corroborated facts, marking superseded ones, deduplicating, a
 FTS5 keyword index and semantic vector search run in parallel, then a merge/ranking layer combines them.
 Pure semantic search misses exact-match technical terms; pure keyword search misses conceptual proximity.
 The merge — not either path alone — is the point.
+
+Hybrid keyword+semantic retrieval is, by now, a well-established pattern — *not* a novel contribution, and
+not presented as one. It's documented here because the system rests on it and because the *integration*
+choices are what matter: running it at **section** granularity, over a **file-first / derived-disposable**
+source of truth, with per-path admission thresholds, feeding the **split budget** (#2). The pattern is
+table stakes; the way it's wired into an evidentiary memory is the point.
 
 ```mermaid
 flowchart TD
@@ -209,6 +220,31 @@ Topics are H2-sectioned markdown; the FTS5 index operates at the *section* level
 This enables budget-aware injection of just the relevant section rather than a whole topic — the
 mechanism that makes decision #2 possible.
 
+### 8. Source-document recall
+
+Held documents (uploaded files) are a second knowledge substrate alongside topic memory: where topics hold
+*distilled* knowledge, documents hold *primary-source* knowledge. Two ideas make them usable — and they are
+what this decision is about, **not** the retrieval technology, which is the same standard FTS5 as #1:
+
+- **Passive discovery as a structural invariant.** A per-agent inventory of held documents is surfaced in
+  context every turn, so the agent is *told what sources it has* rather than having to remember to search.
+  The production failure this fixes was filename-only matching — a document whose answer lived in its body
+  went unfound because its *name* didn't contain the query terms.
+- **Documents as a first-class substrate.** A derived FTS5 index over `filename + gist + body` makes a
+  document's content addressable, and its `[doc:<ref>·<tier>]` citation (#4) resolves to recallable text,
+  not just a registry label. The index is per-agent, derived, and disposable — exactly like the topic index.
+
+The demo shows **discovery feeding re-grading**: a content query surfaces the contractor quote a filename
+search misses, and that same document then drives the supersession in #5 (remove the discovery step and the
+re-grading has no source to cite). The runnable demo is single-tenant; **per-agent isolation** — one index
+per agent, so a document never surfaces for an agent that doesn't own it — is a production property
+described here but not exercised by the demo (it's an assertion about deployment, not an algorithm).
+
+> *Reference scope:* the index and inventory run in the neutral domain. Document text is committed directly
+> (in production it comes from OCR); the gist is authored (in production a utility model generates it,
+> mirroring `ai_summary`); and the `possibly related` overlap threshold, budget figures, and ranking
+> weights are withheld calibration.
+
 ---
 
 ## Publication boundary
@@ -239,6 +275,7 @@ A reference implementation should *demonstrate* each decision, not ship the prod
 | 5 | Temporal re-grading | The concept, annotation format, the two-trigger design | Production reconciliation prompts + promotion/supersession heuristics + thresholds | **High** |
 | 6 | Scheduled consolidation | The slim dedup + re-tier loop; non-destructive / idempotent / budget-aware principles | Production merge prompts + LLM-judgment heuristics; the full sub-task set | Med |
 | 7 | Section-level indexing | Fully — standard technique, no calibration to protect | — | Low |
+| 8 | Source-document recall | Passive inventory + derived content-index mechanism; discovery-as-invariant + the document substrate | Budget figures, the `possibly related` overlap threshold, ranking weights; per-agent isolation is described-only | Low |
 
 The two **High** rows (#3 cue table, #5 mechanism) are where "are we publishing too much?" actually
 bites. The handling: publish the principle and shape in full; withhold the calibrated cue table and the
