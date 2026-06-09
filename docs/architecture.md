@@ -15,8 +15,9 @@ The [repo README](../README.md) is the compressed read; this is the depth.
 
 "Agent memory" is usually shorthand for a vector database: embed every chunk, retrieve top-k by cosine
 similarity, paste into the prompt. That framing answers one narrow question — *which text is semantically
-nearest the query* — and quietly assumes away the problems that actually make persistent memory hard at
-production scale. Four of them:
+nearest the query* — and treats memory as a lookup. Memory is a stack of layers, and a vector-DB framing
+collapses all but one — quietly assuming away the problems that make persistent memory hard at production
+scale. Four of them:
 
 ### 1. What *is* the memory? (substrate)
 
@@ -74,6 +75,16 @@ time — promoting corroborated facts, marking superseded ones, deduplicating, a
 **Source-document recall.** Held documents are a second substrate alongside topic memory: a passive
 per-agent inventory plus a derived content index make a document's text discoverable and recallable, so the
 repository can surface its own primary sources.
+
+> **Lineage.** The file-first, inject-the-markdown-into-the-prompt foundation is well-trodden. Vercel's
+> *AGENTS.md outperforms skills in our agent evals* (Jude Gao, Jan 2026) found passive context scored
+> **100%** where leaving the agent to *decide* to retrieve scored **53%** — *"there's no moment where the
+> agent must decide 'should I look this up?' The information is already present."*
+> ([source](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals)) Open-source
+> assistants like [OpenClaw](https://github.com/openclaw/openclaw) run on the same injected-markdown
+> pattern (`AGENTS.md`, `SOUL.md`). This repo takes that foundation as given; its contribution is the
+> layers built on top — authority-tiered provenance (#3/#4) and temporal re-grading (#5). The "no decision
+> point" principle is exactly what #8 applies to source documents: discovery as a structural invariant.
 
 ---
 

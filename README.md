@@ -23,10 +23,10 @@ implementation. It is a *demonstration of the architecture*, not a copy of the p
 |---|---|
 | **Thesis** | Agent memory is an evidentiary record with a changelog — not a key-value store, and not reducible to its vector index (vectors are a derived retrieval path, not the substrate). |
 | **Source of truth** | Human-readable markdown topic files (`topics/*.md`, H2-sectioned). Every index is derived from them and disposable. |
-| **Retrieval** | Dual-path: FTS5 keyword + semantic vector search, run in parallel and **merged**. |
-| **Injection** | Split token budget (shared pool + separate INDEX cap) so no single topic crowds out cross-domain context. |
 | **Trust** | 7-tier / 14-category provenance vocabulary; every fact tagged inline (`[doc:e037·A]`, `[user]`, `[ai]`). |
 | **Temporal authority** | Facts enter *provisional*, then get promoted (`confirmed by …`) or superseded (`superseded … by …`) as evidence accumulates — non-destructively. |
+| **Retrieval** | Dual-path: FTS5 keyword + semantic vector search, run in parallel and **merged**. |
+| **Injection** | Split token budget (shared pool + separate INDEX cap) so no single topic crowds out cross-domain context. |
 | **Source recall** | Held documents are a first-class substrate: a passive per-agent inventory + a derived content index surface a document's text, so the agent recalls and cites primary sources, not just distilled memory. |
 | **Demo domain** | Home renovation / permitting (spans all 7 tiers: building code → permit guidance → contractor docs → product reviews → homeowner statements → AI inference). |
 
@@ -90,21 +90,38 @@ Two more diagrams — the split budget and the tier/re-grading lifecycle — are
 
 ---
 
-## Why this is hard
+## Memory is a stack, not a search
 
 "Agent memory" is usually shorthand for a vector database: embed every chunk, retrieve top-k by cosine
-similarity, paste into the prompt. That framing answers one narrow question — *which text is
-semantically nearest the query* — and quietly assumes away the problems that make persistent memory hard
-at production scale:
+similarity, paste into the prompt. That answers one narrow question — *which text is semantically nearest
+the query* — and treats memory as a lookup. It isn't a lookup; it's a **stack of layers**, each assuming
+the one beneath it:
 
-1. **What *is* the memory?** A vector index is opaque, lossy, and unauditable. This system treats
-   markdown topic files as the source of truth and every index as a derived, rebuildable view.
-2. **One retrieval path is never enough.** Exact-match terms and conceptual proximity require *both*
-   keyword and semantic search, reconciled by a merge layer, inside a budget no topic can monopolize.
-3. **Not all facts deserve equal trust.** Provenance and an authority model govern how conflicts resolve
-   and when output is flagged for verification.
-4. **Authority is temporal, not fixed at write time.** Facts enter provisionally and are re-graded as
-   evidence accumulates — promoted, superseded, reconciled — and held coherent by a scheduled pass.
+1. **Substrate — what *is* the memory?** A vector index is opaque and unauditable. The ground layer is
+   durable markdown topic files as the source of truth; every index is a derived, rebuildable view.
+2. **Provenance — the foundation everything rests on.** Every fact carries where it came from and an
+   authority tier. You cannot resolve conflicts or safely act on memory you can't weigh by source:
+
+   | A | B | C | D | E | F | G |
+   |---|---|---|---|---|---|---|
+   | regulation | official guidance | professional standard | first-party doc | aggregated 3rd-party | user | AI |
+
+   Facts are tagged inline — `[doc:e037·A]`, `[user]`, `[ai]` — and the tier governs how conflicts resolve.
+3. **Temporal authority — trust changes over time.** A fact's standing is re-graded as evidence
+   accumulates, non-destructively. From the demo: an AI guess — *"composite likely has the lower ten-year
+   cost `[ai]`"* — is **superseded** when the contractor's quote arrives: *"cedar has the lower ten-year
+   cost `[doc:e060·D]`"*. The old belief is kept as audit history, not overwritten.
+4. **Retrieval — getting the right layer back.** Keyword and semantic search, merged, packing the relevant
+   *section* under a budget. A standard, necessary layer — not the system.
+
+**The opinionated part:** provenance and temporal authority aren't bolted onto retrieval — they *are* the
+foundation. Most "agent memory" skips them and ships a vector index; this treats them as non-negotiable.
+A strong foundation is what makes memory safe to *grow*: to absorb messy, high-volume, low-signal inputs
+without flooding itself with garbage. And it's the floor, not the ceiling — memory is layers, like a
+network stack, with more above these (entity resolution — knowing two mentions name the same thing — is
+one). See the [Roadmap](#roadmap).
+
+*Lineage: the file-first, passive-injection foundation is validated by [Vercel's AGENTS.md evals](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals) (passive context scored 100% vs. 53% when the agent must decide to retrieve) and used in practice by assistants like [OpenClaw](https://github.com/openclaw/openclaw); this repo's focus is the evidence layers on top.*
 
 Full treatment: **[docs/architecture.md](docs/architecture.md)**.
 
@@ -161,6 +178,7 @@ for the provenance layer.
 - [x] Slim consolidator: dedup + re-tier (`consolidator.py`)
 - [x] Source-document recall: per-agent FTS5 document index + passive inventory (`documents/`)
 - [x] End-to-end demo (`examples/demo.py`) + tests
+- [ ] **Next:** entity resolution (knowing two mentions name the same thing); a stronger ingestion gate so the foundation can absorb high-volume, low-signal sources without polluting memory
 
 Runs on Python 3.9+ with **zero third-party dependencies** (stdlib `sqlite3` FTS5 + a local embedder).
 
