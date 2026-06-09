@@ -120,12 +120,7 @@ the one beneath it:
    just the memory the model needs — and inform the tool calls it makes next, which may pull more. This
    is the harness: orchestration that lets a model deliver what it couldn't unaided.
 
-**The opinionated part:** provenance and temporal authority aren't bolted onto retrieval — they *are* the
-foundation. Most "agent memory" skips them and ships a vector index; this treats them as non-negotiable.
-A strong foundation is what makes memory safe to *grow*: to absorb messy, high-volume, low-signal inputs
-without flooding itself with garbage. And it's the floor, not the ceiling — memory is layers, like a
-network stack, with more above these (entity resolution — knowing two mentions name the same thing — is
-one). See the [Roadmap](#roadmap).
+**The opinionated part:** provenance and temporal authority aren't bolted onto retrieval — they *are* foundational. This strong foundation is what makes it *safe to admit* additional data channels: every fact enters weighted by its source, so a weak claim stays a weak claim — it can't pass as truth or outrank stronger evidence. Dynamic, topic-based memory with evidentiary standards can serve a wide variety of agentic solutions. See the [Roadmap](#roadmap).
 
 *Lineage: the file-first, passive-injection foundation is validated by [Vercel's AGENTS.md evals](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals) (passive context scored 100% vs. 53% when the agent must decide to retrieve) and used in practice by assistants like [OpenClaw](https://github.com/openclaw/openclaw); this repo's focus is the evidence layers on top.*
 
