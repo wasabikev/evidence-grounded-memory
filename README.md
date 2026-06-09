@@ -113,9 +113,9 @@ the one beneath it:
    cost `[ai]`"* — is **superseded** when the contractor's quote arrives: *"cedar has the lower ten-year
    cost `[doc:e060·D]`"*. The old belief is kept as audit history, not overwritten.
 4. **Consolidation — keeping the corpus coherent.** Left alone, memory bloats fast: duplicate
-   extractions, and contradictions pile up until recall drowns in noise. So each night a
+   extractions and contradictions pile up until recall drowns in noise. So each night a
    pass runs to dedup, reconcile, and re-grade the corpus. Not a nicety: skip it and
-   the stack buries itself under its own volume. Dreaming is needed.
+   the stack buries itself under its own volume. 
 5. **Retrieval — the right context, before inference.** Keyword and semantic search, merged, surface
    just the memory the model needs — and inform the tool calls it makes next, which may pull more. This
    is the harness: orchestration that lets a model deliver what it couldn't unaided.
