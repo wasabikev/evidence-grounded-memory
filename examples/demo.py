@@ -13,6 +13,9 @@ compose. It walks one scenario through the full pipeline:
      recorded non-destructively in the markdown.
   5. Consolidate (asynchronous, #6): the scheduled backstop dedups a duplicate bullet and re-tiers an
      inline tag the runtime got wrong, reconciling against the sources registry.
+  6. Cross-topic backlinks (#9): record a bidirectional link between two topics a vocabulary-mismatched
+     query would never connect, reconcile it (clean), then show reconciliation catching genuine drift
+     after one side's content actually changes.
 
 Run:  python examples/demo.py
 """
@@ -35,6 +38,7 @@ if hasattr(sys.stdout, "reconfigure"):
 from documents.index import DocumentIndex  # noqa: E402
 from documents.inventory import render_inventory  # noqa: E402
 from evidence.sources import SourcesRegistry  # noqa: E402
+from memory.backlinks import LinksRegistry, render_link  # noqa: E402
 from memory.consolidator import consolidate  # noqa: E402
 from memory.injector import MemoryBudget, inject, recall  # noqa: E402
 from memory.semantic_index import SemanticIndex  # noqa: E402
@@ -182,6 +186,54 @@ def main() -> None:
     # Idempotence: a second pass finds nothing left to do.
     second = consolidate(store, registry)
     print(f"\nsecond pass changed anything? {second.changed}  (expected: False)")
+
+    # --- 6. cross-topic backlinks (#9) -------------------------------------------------------------
+    _rule("6. CROSS-TOPIC BACKLINKS")
+
+    links = LinksRegistry(ws / "backlinks.jsonl")
+
+    # The detection step — "does this content also relate to another topic" — is an LLM judgment call
+    # in production, piggybacked on the same extraction call that decides routing. This repo has no LLM
+    # at runtime, so the decision is baked in here as a labeled fixture: real design, illustrative data.
+    # The link: a homeowner choosing decking material won't think to ask about permits, but the permit
+    # rule is exactly what the material choice runs into.
+    print("fixture decision (stands in for the production LLM judgment call):")
+    print('  materials / Decking boards  <->  permits / Deck permits\n')
+
+    print("BEFORE — materials / Decking boards:\n")
+    print(store.get_section("materials", "Decking boards").body)
+    print("\nBEFORE — permits / Deck permits:\n")
+    print(store.get_section("permits", "Deck permits").body)
+
+    link = render_link(store, "materials", "Decking boards", "permits", "Deck permits")
+    links.upsert(link)
+    store.rebuild_index()
+    semantic.rebuild(store.iter_sections())
+
+    print("\nAFTER rendering the link — both sides get an independently-recorded marker:\n")
+    print("materials / Decking boards:\n" + store.get_section("materials", "Decking boards").body)
+    print("\npermits / Deck permits:\n" + store.get_section("permits", "Deck permits").body)
+
+    report = consolidate(store, registry, links=links.all())
+    print(f"\nreconciliation right after linking: {report.link_issues}  (expected: [])")
+
+    # Genuine drift: the permit's structural-review trigger gets a real update — not a marker churn,
+    # an actual new fact. A purely *derived* backlink (recomputed from one side, never independently
+    # recorded) could never detect this; the double-entry framing is what makes it checkable.
+    permits_text = store.read_topic("permits")
+    permits_text = permits_text.replace(
+        "- Decks over 200 square feet also require a structural plan review. [doc:e037·A]\n",
+        "- Decks over 200 square feet also require a structural plan review. [doc:e037·A]\n"
+        "- As of the 2026 code update, structural plan review now also applies to decks over 8 feet"
+        " above grade, regardless of square footage. [doc:e037·A]\n",
+    )
+    store.write_topic("permits", permits_text)
+    store.rebuild_index()
+
+    report = consolidate(store, registry, links=links.all())
+    print(f"reconciliation after permits/Deck permits genuinely changed: {report.link_issues}")
+    print("(expected: one 'stale' finding — the link survives a re-render; production's nightly")
+    print(" consolidator surfaces this as a flag for review, it doesn't auto-resolve it)")
 
     _rule("DONE")
     print(f"inspect the mutated workspace at: {ws}")

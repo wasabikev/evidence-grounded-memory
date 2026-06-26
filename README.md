@@ -40,7 +40,7 @@ python examples/demo.py     # ingest → tag → recall → inject, end to end
 
 ---
 
-## The eight design decisions
+## The nine design decisions
 
 The table below is the spine of the repo. Each decision exists because the obvious approach fails in a
 specific, nameable way.
@@ -55,6 +55,7 @@ specific, nameable way.
 | 6 | **Scheduled consolidation** | Keep the corpus coherent without manual curation | Left alone, a memory store drifts into duplication, contradiction, and stale confidence. A non-destructive, idempotent, budget-aware pass backstops runtime and re-grades the corpus. |
 | 7 | **Section-level indexing** | Inject just the relevant *section*, not a whole topic | Document-level indexing forces a choice between injecting an entire topic (blows the budget) or nothing. H2-sectioned markdown indexed at section granularity makes budget-aware injection possible. |
 | 8 | **Source-document recall** | Make held documents discoverable and content-searchable, per agent | Holding a document isn't the same as being able to use it: filename-only search misses what's in the body, and the agent can't reach for a source it doesn't know it has. A passive per-agent inventory + a derived content index let the repository surface its own primary sources. |
+| 9 | **Cross-topic backlinks** | Let related facts in different topics know about each other | The obvious fix is a graph database — but the entities already exist (topic routing already solved that); the actual gap is structural. A link recorded as **two independently-written markers**, not one derived from the other, is checkable: the consolidator can catch a marker that's gone missing or content that's drifted since the link was made. A purely derived backlink is consistent by construction and could never detect either. |
 
 **Temporal re-grading (#5)** is where this design departs most from conventional agent memory — it models
 something a vector index leaves out entirely: a fact's standing changing as evidence accumulates. It is
@@ -114,7 +115,8 @@ the one beneath it:
    cost `[doc:e060·D]`"*. The old belief is kept as audit history, not overwritten.
 4. **Consolidation — keeping the corpus coherent.** Left alone, memory bloats fast: duplicate
    extractions and contradictions pile up until recall drowns in noise. So each night a
-   pass runs to dedup, reconcile, and re-grade the corpus. Not a nicety: skip it and
+   pass runs to dedup, reconcile, and re-grade the corpus — including catching a cross-topic
+   link (#9) that's lost a marker or drifted out of sync. Not a nicety: skip it and
    the stack buries itself under its own volume. 
 5. **Retrieval — the right context, before inference.** Keyword and semantic search, merged, surface
    just the memory the model needs — and inform the tool calls it makes next, which may pull more. This
@@ -140,7 +142,8 @@ evidence-grounded-memory/
 │   ├── store.py               ← file-first store + FTS5 section index
 │   ├── semantic_index.py      ← vector search layer
 │   ├── injector.py            ← split-budget injection + dual-path merge
-│   └── consolidator.py        ← slim consolidator: dedup + re-tier
+│   ├── consolidator.py        ← slim consolidator: dedup + re-tier + link reconciliation
+│   └── backlinks.py           ← cross-topic links: render + reconcile (decision #9)
 ├── evidence/                  ← the authority / provenance layer
 │   ├── tiers.py               ← 7-tier / 14-category vocabulary + resolver
 │   └── sources.py             ← sources registry schema + tag parser
@@ -171,13 +174,14 @@ for the provenance layer.
 
 ## Roadmap
 
-- [x] Design narrative + eight decisions
+- [x] Design narrative + nine decisions
 - [x] Evidence layer (`tiers.py`, `sources.py`)
 - [x] File-first store + section-level FTS5 (`store.py`)
 - [x] Semantic index (`semantic_index.py`)
 - [x] Split-budget dual-path injector (`injector.py`)
 - [x] Slim consolidator: dedup + re-tier (`consolidator.py`)
 - [x] Source-document recall: per-agent FTS5 document index + passive inventory (`documents/`)
+- [x] Cross-topic backlinks: double-entry link rendering + reconciliation (`backlinks.py`)
 - [x] End-to-end demo (`examples/demo.py`) + tests
 - [ ] **Next:** entity resolution (knowing two mentions name the same thing); a stronger ingestion gate so the foundation can absorb high-volume, low-signal sources without polluting memory
 

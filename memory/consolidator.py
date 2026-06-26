@@ -1,7 +1,8 @@
-"""Slim consolidation pass — async path for temporal re-grading (decisions #5 async, #6).
+"""Slim consolidation pass — async path for temporal re-grading (decisions #5 async, #6) and link
+integrity (#9).
 
 The scheduled backstop that keeps the corpus coherent. This reference version is deliberately slim and
-does two mechanical, idempotent things:
+does three mechanical, idempotent things:
 
   1. **Dedup.** Remove exact-duplicate bullets *within a section* (two extraction passes writing the same
      fact). Only verbatim duplicates are dropped — annotated, confirmed, and superseded bullets are
@@ -12,11 +13,16 @@ does two mechanical, idempotent things:
      is re-graded — or the runtime tagged a bullet with the wrong tier — the consolidator corrects the
      inline tag to match. The registry is the single source of authority for a source's standing.
 
-Both passes are **non-destructive** (no fact is deleted; supersession is recorded, not erased) and
+  3. **Reconcile backlinks (#9).** Delegates to :func:`memory.backlinks.reconcile` — a deterministic
+     double-entry check that every recorded link still has both its markers and hasn't drifted. No LLM
+     judgment; see ``memory/backlinks.py`` for why.
+
+All three passes are **non-destructive** (no fact is deleted; supersession is recorded, not erased) and
 **idempotent** (running twice produces no further change). Re-running yields an empty report.
 
-Described-only (not in this runnable core): task archival, profile dedup, topic-reorg overflow handling,
-and the production LLM-judgment merge prompts. See docs/architecture.md.
+Described-only (not in this runnable core): task archival, profile dedup, topic-reorg overflow handling
+(including the corresponding backlink-marker rewrite on reorg), and the production LLM-judgment merge
+prompts. See docs/architecture.md.
 """
 
 from __future__ import annotations
@@ -25,6 +31,7 @@ import re
 from dataclasses import dataclass, field
 
 from evidence.sources import SourcesRegistry
+from memory.backlinks import Link, LinkIssue, reconcile as reconcile_links
 from memory.store import MemoryStore
 
 _H2_LINE_RE = re.compile(r"^##\s+(.+?)\s*$")
@@ -39,17 +46,23 @@ class ConsolidationReport:
 
     deduped: list[str] = field(default_factory=list)            # bullet text removed as duplicate
     retiered: list[tuple[str, str, str]] = field(default_factory=list)  # (ref, old_tier, new_tier)
+    link_issues: list[LinkIssue] = field(default_factory=list)   # #9 — backlink reconciliation findings
 
     @property
     def changed(self) -> bool:
         return bool(self.deduped or self.retiered)
 
 
-def consolidate(store: MemoryStore, registry: SourcesRegistry) -> ConsolidationReport:
-    """One non-destructive, idempotent dedup + re-tier pass over the topic corpus.
+def consolidate(
+    store: MemoryStore,
+    registry: SourcesRegistry,
+    links: list[Link] | None = None,
+) -> ConsolidationReport:
+    """One non-destructive, idempotent dedup + re-tier + link-reconciliation pass over the corpus.
 
     Rewrites the markdown source of truth in place, then rebuilds the derived FTS5 index so subsequent
-    recall reflects the reconciled tiers.
+    recall reflects the reconciled tiers. ``links`` is optional (omit if decision #9 isn't in play) —
+    reconciliation never mutates the corpus, it only reports findings (``report.link_issues``).
     """
     report = ConsolidationReport()
 
@@ -62,6 +75,10 @@ def consolidate(store: MemoryStore, registry: SourcesRegistry) -> ConsolidationR
 
     if report.changed:
         store.rebuild_index()
+
+    if links:
+        report.link_issues = reconcile_links(store, links)
+
     return report
 
 

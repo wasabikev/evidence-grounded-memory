@@ -5,7 +5,7 @@
 
 ## Purpose
 
-The long-form design narrative behind the reference implementation: the problem framing, the eight
+The long-form design narrative behind the reference implementation: the problem framing, the nine
 design decisions, and the boundary between what this repo publishes and what it deliberately withholds.
 The [repo README](../README.md) is the compressed read; this is the depth.
 
@@ -54,6 +54,9 @@ into contradiction and stale confidence.
 
 These four problems map directly onto decisions #1–#7 below. An eighth decision — **source-document
 recall** — extends the same file-first thesis to a second substrate (held documents), and is covered in §8.
+A ninth — **cross-topic backlinks** — answers a question the four problems above don't quite cover: not
+"is this fact trustworthy" but "does this topic know about a related fact living in a different file."
+Covered in §9.
 
 ---
 
@@ -75,6 +78,10 @@ time — promoting corroborated facts, marking superseded ones, deduplicating, a
 **Source-document recall.** Held documents are a second substrate alongside topic memory: a passive
 per-agent inventory plus a derived content index make a document's text discoverable and recallable, so the
 repository can surface its own primary sources.
+
+**Cross-topic backlinks.** A link between two topic sections is recorded as two independently-written
+markers, not one derived from the other — so the consolidator can reconcile them and catch drift, the
+same way it reconciles authority tiers (#6).
 
 > **Lineage.** The file-first, inject-the-markdown-into-the-prompt foundation is well-trodden. Vercel's
 > *AGENTS.md outperforms skills in our agent evals* (Jude Gao, Jan 2026) found passive context scored
@@ -256,6 +263,41 @@ described here but not exercised by the demo (it's an assertion about deployment
 > mirroring `ai_summary`); and the `possibly related` overlap threshold, budget figures, and ranking
 > weights are withheld calibration.
 
+### 9. Cross-topic backlinks
+
+The obvious answer to "how do facts about related things stay connected" is a graph database. That's the
+wrong size here: topic routing (#1–#7) already resolved *which file* a fact belongs in — the entities
+already exist. What's missing isn't an index, it's a cheap way to record "this also relates to that"
+using the same write path everything else uses.
+
+The mechanism is **double-entry, not derived**: a forward marker in topic A's section, a "referenced by"
+marker in topic B's section — two independently-written facts, not one computed from the other at read
+time. That's the entire reason it's checkable. A backlink *derived* from one side (recomputed on demand,
+never separately stored) is consistent by construction — there is nothing to compare it against, so
+nothing can ever be detected as wrong. Two independently-recorded sides can drift, and a mismatch between
+them is exactly the signal worth catching:
+
+- **Missing marker.** A manual edit removes one side's annotation; reconciliation notices the other
+  side now points at nothing.
+- **Stale link.** The linked-to section's *substantive* content changes after the link was made. The
+  snapshot used for this comparison strips marker lines before hashing — otherwise the act of creating
+  the link would itself look like drift, since writing the reverse marker is a write to that section.
+
+Reconciliation is mechanical — a regex match for the marker, a hash comparison — the same shape as #6's
+dedup + re-tier passes, run from the same scheduled pass (`consolidator.py` delegates to
+`backlinks.reconcile`). No LLM judgment is needed for the check; *deciding* two topics are related in the
+first place is the one step that does take judgment (see below).
+
+> *Reference scope:* detecting *that* two topics relate is, in production, an LLM judgment call
+> piggybacked on the same extraction step that already routes content to a topic — this repo has no LLM
+> at runtime, so the demo bakes that decision in as a labeled fixture ("real design, illustrative data"),
+> the same treatment `ai_summary` got for #8. Rewriting a link's markers when a topic is renamed, merged,
+> or split is **described-only** — this repo's consolidator already treats topic-reorg the same way (see
+> `consolidator.py`'s module docstring), and link-rewrite-on-reorg inherits that boundary rather than
+> introducing a new one. Production reuses the exact old→new section mapping its reorg pass already
+> computes for its own bookkeeping; nothing about that is calibration, it just isn't runnable here because
+> reorg itself isn't.
+
 ---
 
 ## Publication boundary
@@ -287,6 +329,7 @@ A reference implementation should *demonstrate* each decision, not ship the prod
 | 6 | Scheduled consolidation | The slim dedup + re-tier loop; non-destructive / idempotent / budget-aware principles | Production merge prompts + LLM-judgment heuristics; the full sub-task set | Med |
 | 7 | Section-level indexing | Fully — standard technique, no calibration to protect | — | Low |
 | 8 | Source-document recall | Passive inventory + derived content-index mechanism; discovery-as-invariant + the document substrate | Budget figures, the `possibly related` overlap threshold, ranking weights; per-agent isolation is described-only | Low |
+| 9 | Cross-topic backlinks | Fully — the double-entry mechanism, marker rendering, and reconciliation are all structural, no calibration to protect | Detection itself stays an LLM judgment call (described-only, demo uses a fixture); reorg-driven marker rewrite is described-only, same as topic-reorg | Low |
 
 The two **High** rows (#3 cue table, #5 mechanism) are where "are we publishing too much?" actually
 bites. The handling: publish the principle and shape in full; withhold the calibrated cue table and the
