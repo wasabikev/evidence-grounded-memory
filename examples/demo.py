@@ -11,8 +11,11 @@ compose. It walks one scenario through the full pipeline:
   4. Re-grade (synchronous, #5): promote a provisional homeowner statement when official guidance
      corroborates it, and supersede an AI inference when the contractor quote contradicts it — both
      recorded non-destructively in the markdown.
-  5. Consolidate (asynchronous, #6): the scheduled backstop dedups a duplicate bullet and re-tiers an
-     inline tag the runtime got wrong, reconciling against the sources registry.
+  5. Consolidate (asynchronous, #6): the scheduled backstop dedups a duplicate bullet (punctuation-
+     insensitive key) and re-tiers an inline tag the runtime got wrong, reconciling against the sources
+     registry. Also demonstrates the *triggered* half of #6: a single oversized section escalating
+     through a safety-ordered ladder — exact_dedup (free, lossless) before compress (illustrative) — the
+     moment it crosses budget, rather than waiting for this same nightly pass.
   6. Cross-topic backlinks (#9): record a bidirectional link between two topics a vocabulary-mismatched
      query would never connect, reconcile it (clean), then show reconciliation catching genuine drift
      after one side's content actually changes.
@@ -42,7 +45,7 @@ if hasattr(sys.stdout, "reconfigure"):
 from documents.index import DocumentIndex  # noqa: E402
 from evidence.sources import SourcesRegistry  # noqa: E402
 from memory.backlinks import LinksRegistry, render_link  # noqa: E402
-from memory.consolidator import consolidate  # noqa: E402
+from memory.consolidator import consolidate, remediate_section  # noqa: E402
 from memory.coverage import ConversationCandidate, coverage_report  # noqa: E402
 from memory.injector import MemoryBudget, inject, recall  # noqa: E402
 from memory.semantic_index import SemanticIndex  # noqa: E402
@@ -187,6 +190,34 @@ def main() -> None:
     # Idempotence: a second pass finds nothing left to do.
     second = consolidate(store, registry)
     print(f"\nsecond pass changed anything? {second.changed}  (expected: False)")
+
+    # --- 5. triggered remediation ladder, in-session (#6) ------------------------------------------
+    _rule("5. TRIGGERED REMEDIATION LADDER (in-session, escalates only while over budget)")
+
+    # Simulate a section growing past its budget in one session: a second extraction pass reworded an
+    # existing fact's punctuation only (rung 1 catches this, lossless), plus a genuinely new fact that
+    # pushes the section over a demo-scaled length threshold even after the duplicate is gone (rung 2).
+    materials = store.read_topic("materials")
+    materials = materials.replace(
+        "- Stainless steel fasteners are recommended for any deck near salt air. [doc:e055·C]",
+        "- Stainless steel fasteners are recommended for any deck near salt air. [doc:e055·C]\n"
+        "- Fastener spec: grade 316 stainless required within 1500 ft of saltwater. [doc:e055·C]\n"
+        "- Fastener spec — grade 316 stainless required within 1500 ft of saltwater. [doc:e055·C]\n"
+        "- Torque specs for structural lag screws are listed in the fastener install guide, not the"
+        " general building code. [doc:e055·C]",
+    )
+    store.write_topic("materials", materials)
+    store.rebuild_index()
+
+    print("BEFORE — materials / Fasteners (note the punctuation-only-variant duplicate):\n")
+    print(store.get_section("materials", "Fasteners").body)
+
+    remediation = remediate_section(store, "materials", "Fasteners")
+
+    print(f"\nrung 1 (exact_dedup) removed: {remediation.exact_dedup_removed}")
+    print(f"rung 2 (compress) ran: {remediation.compress_ran}  (only because still over budget after rung 1)")
+    print("\nAFTER remediation:\n")
+    print(store.get_section("materials", "Fasteners").body)
 
     # --- 6. cross-topic backlinks (#9) -------------------------------------------------------------
     _rule("6. CROSS-TOPIC BACKLINKS")

@@ -68,6 +68,11 @@ and **section-level indexing (#7)** — are deliberately *standard* best practic
 system rests on them, not as novel contributions: hybrid keyword+semantic retrieval is table stakes here,
 and this design treats it as such.
 
+Consolidation's dedup key is punctuation-insensitive (catches `tailwindcss: ^4.3.2` vs
+`tailwindcss@^4.3.2` as the same fact) and, in-session, escalates through a safety-ordered ladder —
+free/lossless `exact_dedup` before paid/lossy `compress` — so a bloated section is never force-compressed
+while a cheaper fix would have healed it.
+
 The markdown topic files are the source of truth; both indexes are derived and disposable, and the
 **merge** — not either path alone — is the point:
 

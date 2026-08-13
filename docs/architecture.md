@@ -232,6 +232,24 @@ prevents corpus drift. Non-destructive, idempotent, budget-aware.
 > sources registry. Task archival, profile dedup, and topic-reorg overflow handling exist in production
 > and are described-only.
 
+#### A safety-ordered remediation ladder
+
+A bare "oversized section → compress" rule can't distinguish two different problems: duplicate bloat (safe
+to collapse, loses nothing) and genuine drill-down growth (compressing it is real data loss). The fix is
+ordering, not a smarter compressor: an in-session ladder that tries `exact_dedup` — free, lossless, the
+same normalized-key match `consolidate()` already runs nightly — first, and only escalates to `compress`
+(LLM, preservation-intended) while the section is still over budget after that. A section that survives
+both rungs un-healed is flagged, not force-compressed — the ladder's ordering *is* the cause-diagnosis:
+cheap and reversible before expensive and lossy.
+
+The dedup key itself is punctuation-insensitive, closing a gap where the exact-string key missed
+format-only reword of the same fact (`tailwindcss: ^4.3.2` vs `tailwindcss@^4.3.2`) — the dominant
+duplicate pattern observed in practice, distinct from genuine paraphrase.
+
+> *Reference scope:* the ladder and the punctuation-insensitive key are both fully runnable here. The
+> trigger condition uses an illustrative, demo-scaled length threshold — production's real embedding-budget
+> threshold and per-topic cooldown are withheld calibration, per the publication boundary below.
+
 ### 7. Section-level indexing
 
 Topics are H2-sectioned markdown; the FTS5 index operates at the *section* level, not the document level.
@@ -351,7 +369,7 @@ A reference implementation should *demonstrate* each decision, not ship the prod
 | 3 | Authority-tiered provenance | Tag format, the 7-tier skeleton, the *concept* of MECE categories | The tuned 14-category cue table (domain-calibrated recognition cues) — generic version only | **High** |
 | 4 | Sources registry | Schema shape + tag→source resolution flow | Production enrichment heuristics (independence/recency/scope-fit scoring) | Med |
 | 5 | Temporal re-grading | The concept, annotation format, the two-trigger design | Production reconciliation prompts + promotion/supersession heuristics + thresholds | **High** |
-| 6 | Scheduled consolidation | The slim dedup + re-tier loop; non-destructive / idempotent / budget-aware principles | Production merge prompts + LLM-judgment heuristics; the full sub-task set | Med |
+| 6 | Scheduled consolidation | The slim dedup + re-tier loop; non-destructive / idempotent / budget-aware principles; the punctuation-insensitive dedup key; the free-before-paid, lossless-before-lossy remediation ladder | Production merge prompts + LLM-judgment heuristics; the full sub-task set; the real embedding-budget threshold and cooldown value | Med |
 | 7 | Section-level indexing | Fully — standard technique, no calibration to protect | — | Low |
 | 8 | Source-document recall | Content-index + on-demand citation resolution; discovery-as-invariant reframed as resolve-on-demand; the removed standing-inventory mechanism, described as a measured-and-reversed design choice | Per-agent isolation is described-only | Low |
 | 9 | Cross-topic backlinks | Fully — the double-entry mechanism, marker rendering, and reconciliation are all structural, no calibration to protect | Detection itself stays an LLM judgment call (described-only, demo uses a fixture); reorg-driven marker rewrite is described-only, same as topic-reorg | Low |
