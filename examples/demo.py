@@ -16,6 +16,9 @@ compose. It walks one scenario through the full pipeline:
   6. Cross-topic backlinks (#9): record a bidirectional link between two topics a vocabulary-mismatched
      query would never connect, reconcile it (clean), then show reconciliation catching genuine drift
      after one side's content actually changes.
+  7. Proactive coverage sweep (#10): compare what two reactive session-summary triggers would catch
+     against a backlog of stale, unsummarized conversations with what a proactive sweep catches directly
+     — the residual is the coverage gap the reactive design structurally cannot close.
 
 Run:  python examples/demo.py
 """
@@ -25,6 +28,7 @@ from __future__ import annotations
 import shutil
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 # Make the repo root importable when run as `python examples/demo.py`.
@@ -39,6 +43,7 @@ from documents.index import DocumentIndex  # noqa: E402
 from evidence.sources import SourcesRegistry  # noqa: E402
 from memory.backlinks import LinksRegistry, render_link  # noqa: E402
 from memory.consolidator import consolidate  # noqa: E402
+from memory.coverage import ConversationCandidate, coverage_report  # noqa: E402
 from memory.injector import MemoryBudget, inject, recall  # noqa: E402
 from memory.semantic_index import SemanticIndex  # noqa: E402
 from memory.store import MemoryStore  # noqa: E402
@@ -230,6 +235,49 @@ def main() -> None:
     print(f"reconciliation after permits/Deck permits genuinely changed: {report.link_issues}")
     print("(expected: one 'stale' finding — the link survives a re-render; production's nightly")
     print(" consolidator surfaces this as a flag for review, it doesn't auto-resolve it)")
+
+    # --- 7. proactive coverage sweep (#10) -----------------------------------------------------------
+    _rule("7. PROACTIVE COVERAGE SWEEP (reactive vs. proactive trigger comparison)")
+
+    now = datetime.fromisoformat("2026-08-13T00:00:00")
+    candidates = [
+        ConversationCandidate(
+            "deck-permit-followup", created_at="2026-08-12T14:00:00",
+            last_message_at="2026-08-12T22:00:00", has_summary=False,
+        ),  # active a couple hours ago -- not stale, excluded from every set below
+        ConversationCandidate(
+            "fence-quote-review", created_at="2026-07-20T09:00:00",
+            last_message_at="2026-07-20T09:40:00", has_summary=False,
+        ),  # the most recently *created* stale conversation -- Secondary's one rescue slot
+        ConversationCandidate(
+            "roof-inspection-notes", created_at="2026-05-02T11:00:00",
+            last_message_at="2026-05-02T11:15:00", has_summary=False,
+        ),  # older, never revisited -- falls through both reactive triggers
+        ConversationCandidate(
+            "kitchen-remodel-budget", created_at="2026-02-14T16:00:00",
+            last_message_at="2026-02-14T16:30:00", has_summary=False,
+        ),  # older still, same story
+    ]
+
+    print("candidate conversations (home-renovation demo domain):\n")
+    for c in candidates:
+        print(f"  {c.conversation_id:22} created={c.created_at}  last_message={c.last_message_at}")
+
+    report = coverage_report(candidates, now=now, idle_threshold_hours=24)
+
+    print(f"\nstale + unsummarized (the actual candidate set): {sorted(report.stale_ids)}")
+    print(
+        f"Primary would catch:   {sorted(report.primary_ids)}  "
+        "(fires on new messages -- none of these are getting any)"
+    )
+    print(
+        f"Secondary would catch: {sorted(report.secondary_ids)}  "
+        "(only the single most-recently-created other conversation)"
+    )
+    print(f"Sweep catches:         {sorted(report.sweep_ids)}  (the full stale set, enumerated directly)")
+    print(f"\nresidual -- reached ONLY by the sweep: {sorted(report.residual_ids)}")
+    print("(these would sit unsummarized indefinitely under the two reactive triggers alone --")
+    print(" the gap a purely reactive design structurally cannot close)")
 
     _rule("DONE")
     print(f"inspect the mutated workspace at: {ws}")

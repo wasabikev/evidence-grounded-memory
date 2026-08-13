@@ -29,6 +29,7 @@ implementation. It is a *demonstration of the architecture*, not a copy of the p
 | **Injection** | Split token budget (shared pool + separate INDEX cap) so no single topic crowds out cross-domain context. |
 | **Source recall** | Held documents are a first-class substrate, reached the same way topic memory is: an inline `[doc:<ref>]` citation when memory has already drawn on a document, or an explicit content search when it hasn't. *(Earlier versions of this design pushed a standing per-agent inventory into every turn — measured, found redundant with the citation channel and a performance sink, and removed. See §8.)* |
 | **Demo domain** | Home renovation / permitting (spans all 7 tiers: building code → permit guidance → contractor docs → product reviews → homeowner statements → AI inference). |
+| **Coverage reasoning** | Two reactive summarization triggers look like coverage until you ask *whose* activity each depends on — a proactive sweep closes the gap they structurally can't reach, and the repository can name exactly which conversations it would otherwise have missed. |
 
 **Quickstart**
 
@@ -40,7 +41,7 @@ python examples/demo.py     # ingest → tag → recall → inject, end to end
 
 ---
 
-## The nine design decisions
+## The ten design decisions
 
 The table below is the spine of the repo. Each decision exists because the obvious approach fails in a
 specific, nameable way.
@@ -56,6 +57,7 @@ specific, nameable way.
 | 7 | **Section-level indexing** | Inject just the relevant *section*, not a whole topic | Document-level indexing forces a choice between injecting an entire topic (blows the budget) or nothing. H2-sectioned markdown indexed at section granularity makes budget-aware injection possible. |
 | 8 | **Source-document recall** | Make held documents discoverable and content-searchable, per agent | Filename-only search misses what's in a document's body, and an agent can't reach for a source it doesn't know it has. The first fix was a standing per-agent inventory pushed into every turn — but measurement showed it was redundant with the citation channel for cited documents and a performance sink (an O(all documents) index rebuild on the request path). The fix that stuck: content lives one hop from its citation — `[doc:<ref>]` resolves to searchable text — and an uncited-but-relevant document is treated as a gap in *extraction*, not a gap a standing catalog should paper over. |
 | 9 | **Cross-topic backlinks** | Let related facts in different topics know about each other | The obvious fix is a graph database — but the entities already exist (topic routing already solved that); the actual gap is structural. A link recorded as **two independently-written markers**, not one derived from the other, is checkable: the consolidator can catch a marker that's gone missing or content that's drifted since the link was made. A purely derived backlink is consistent by construction and could never detect either. |
+| 10 | **Proactive coverage sweep** | Guarantee every stale, unsummarized conversation eventually gets reached | Two reactive triggers *feel* like coverage — but each depends on *whose* activity fires it: a user who never returns, or who has several stale conversations at once (a "check the most recent one" trigger only ever re-checks one), falls through both. A third, independent, non-reactive sweep that enumerates the actual candidate set — not waiting to be triggered — is the only design that can name its own blind spots. |
 
 **Temporal re-grading (#5)** is where this design departs most from conventional agent memory — it models
 something a vector index leaves out entirely: a fact's standing changing as evidence accumulates. It is
@@ -144,7 +146,8 @@ evidence-grounded-memory/
 │   ├── semantic_index.py      ← vector search layer
 │   ├── injector.py            ← split-budget injection + dual-path merge
 │   ├── consolidator.py        ← slim consolidator: dedup + re-tier + link reconciliation
-│   └── backlinks.py           ← cross-topic links: render + reconcile (decision #9)
+│   ├── backlinks.py           ← cross-topic links: render + reconcile (decision #9)
+│   └── coverage.py            ← reactive-vs-proactive trigger comparison (decision #10)
 ├── evidence/                  ← the authority / provenance layer
 │   ├── tiers.py               ← 7-tier / 14-category vocabulary + resolver
 │   └── sources.py             ← sources registry schema + tag parser
@@ -174,7 +177,7 @@ for the provenance layer.
 
 ## Roadmap
 
-- [x] Design narrative + nine decisions
+- [x] Design narrative + ten decisions
 - [x] Evidence layer (`tiers.py`, `sources.py`)
 - [x] File-first store + section-level FTS5 (`store.py`)
 - [x] Semantic index (`semantic_index.py`)
@@ -182,6 +185,7 @@ for the provenance layer.
 - [x] Slim consolidator: dedup + re-tier (`consolidator.py`)
 - [x] Source-document recall: per-agent FTS5 document index, resolved on demand (`documents/`)
 - [x] Cross-topic backlinks: double-entry link rendering + reconciliation (`backlinks.py`)
+- [x] Proactive coverage sweep: reactive-vs-proactive trigger comparison (`coverage.py`)
 - [x] End-to-end demo (`examples/demo.py`) + tests
 - [ ] **Next:** entity resolution (knowing two mentions name the same thing); a stronger ingestion gate so the foundation can absorb high-volume, low-signal sources without polluting memory
 

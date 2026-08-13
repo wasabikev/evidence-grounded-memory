@@ -5,7 +5,7 @@
 
 ## Purpose
 
-The long-form design narrative behind the reference implementation: the problem framing, the nine
+The long-form design narrative behind the reference implementation: the problem framing, the ten
 design decisions, and the boundary between what this repo publishes and what it deliberately withholds.
 The [repo README](../README.md) is the compressed read; this is the depth.
 
@@ -300,6 +300,29 @@ first place is the one step that does take judgment (see below).
 > computes for its own bookkeeping; nothing about that is calibration, it just isn't runnable here because
 > reorg itself isn't.
 
+### 10. Proactive coverage sweep
+
+The first two decisions in this stack (dual-path recall, split-budget injection) assume the memory
+*itself* is complete — the open question they don't answer is whether the repository actually has a
+summary of everything it should. Two reactive triggers cover most of it: a new message in the same
+conversation, or a new conversation started (which checks the single most-recently-created other
+conversation). Both look like coverage until you ask *whose activity* each one depends on. A user who
+never starts another conversation at all falls through both. A user with several stale conversations only
+ever gets the most recent one re-checked by the second trigger — the rest sit uncovered indefinitely.
+
+The fix isn't a third variation on "wait for the user to do something" — it's a structurally independent
+sweep that enumerates the actual candidate set (every conversation past its idle threshold with no summary
+yet) and works through it directly, capped and deduplicated against work already in flight.
+`memory/coverage.py` demonstrates the comparison: given a set of conversations, show what each reactive
+trigger would catch, then show what the sweep catches that neither would have reached. The residual is the
+point — a repository that can name its own blind spots is doing something a purely reactive design
+structurally cannot.
+
+> *Reference scope:* the comparison logic is the full runnable proof. Production's actual scheduling —
+> hourly cadence, a 20/pass cap, a 3-attempt retry limit before a conversation drops out of re-candidacy, a
+> Redis-persisted resume timestamp across restarts — is described here as real values, not illustrative
+> ones, since none of them are domain-tuned calibration; see the publication-boundary table.
+
 ---
 
 ## Publication boundary
@@ -332,6 +355,7 @@ A reference implementation should *demonstrate* each decision, not ship the prod
 | 7 | Section-level indexing | Fully — standard technique, no calibration to protect | — | Low |
 | 8 | Source-document recall | Content-index + on-demand citation resolution; discovery-as-invariant reframed as resolve-on-demand; the removed standing-inventory mechanism, described as a measured-and-reversed design choice | Per-agent isolation is described-only | Low |
 | 9 | Cross-topic backlinks | Fully — the double-entry mechanism, marker rendering, and reconciliation are all structural, no calibration to protect | Detection itself stays an LLM judgment call (described-only, demo uses a fixture); reorg-driven marker rewrite is described-only, same as topic-reorg | Low |
+| 10 | Proactive coverage sweep | Fully — the trigger-comparison logic, and the actual scheduling parameters (hourly/20-cap/3-attempt) as real values | — (no domain-tuned calibration to protect) | Low |
 
 The two **High** rows (#3 cue table, #5 mechanism) are where "are we publishing too much?" actually
 bites. The handling: publish the principle and shape in full; withhold the calibrated cue table and the
