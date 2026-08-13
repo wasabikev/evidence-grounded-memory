@@ -7,10 +7,10 @@ construction — rebuilt from the documents manifest + body files at any time.
 
 Why this is decision #8 and not "search, again": the novelty isn't FTS5 — that's the *same standard
 retrieval* as the keyword path in #1, deliberately reused here. The decision is that the **content of held
-documents becomes addressable at all**, so the knowledge repository can surface its own primary sources
-instead of relying on the agent to remember a search tool. The production failure this fixes was
-filename-only matching: a document whose answer lives in its body went unfound because its *name* didn't
-contain the query terms.
+documents becomes addressable at all**, so the knowledge repository's content is addressable the moment
+memory cites it or an agent searches for it, not gated behind a separate injected catalog. The production
+failure this fixes was filename-only matching: a document whose answer lives in its body went unfound
+because its *name* didn't contain the query terms.
 
 Scope of this reference: production keys one index **per agent** so documents never leak across agents;
 that structural isolation is described in the architecture but not exercised by this single-tenant demo,
@@ -127,7 +127,7 @@ class DocumentIndex:
         """Content-aware document search over filename + gist + body, bm25-ranked (higher-is-better).
 
         The *same* standard FTS5 retrieval as the keyword path (#1), applied to the document substrate —
-        the decision is the substrate and its passive surfacing (#8), not the search technology.
+        the decision is the substrate and its on-demand resolution (#8), not the search technology.
         """
         match = build_fts_query(query)
         if not match:

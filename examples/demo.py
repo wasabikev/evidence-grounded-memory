@@ -36,7 +36,6 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 from documents.index import DocumentIndex  # noqa: E402
-from documents.inventory import render_inventory  # noqa: E402
 from evidence.sources import SourcesRegistry  # noqa: E402
 from memory.backlinks import LinksRegistry, render_link  # noqa: E402
 from memory.consolidator import consolidate  # noqa: E402
@@ -90,8 +89,8 @@ def main() -> None:
     print("\ninjected context block (what the model would receive):\n")
     print(inject(query, store, semantic, MemoryBudget()))
 
-    # --- 2. document recall: passive inventory + content search (#8) ------------------------------
-    _rule("2. DOCUMENT RECALL (passive inventory + content search)")
+    # --- 2. document recall: on-demand content search (#8) ----------------------------------------
+    _rule("2. DOCUMENT RECALL (on-demand content search)")
     doc_index = DocumentIndex.from_manifest(ws / "documents.jsonl")
 
     money_q = "is cedar or composite cheaper over ten years for this deck"
@@ -111,13 +110,10 @@ def main() -> None:
     for m in content_hits:
         print(f"  {m.relevance:7.4f}  [doc:{m.document.ref}]  {m.document.filename}")
 
-    print("\npassive 'Source documents' block the agent receives this turn:\n")
-    print(render_inventory(doc_index, money_q))
-
     discovered = content_hits[0].document
     print(f"\n-> discovered source: [doc:{discovered.ref}] {discovered.filename}")
-    print("   the agent can now answer 'cedar' from the document — and this is the same source that")
-    print("   drives the supersession in the next act (discovery feeds re-grading).")
+    print("   the agent reaches for this explicitly, the way search_documents works in production —")
+    print("   and this is the same source that drives the supersession in the next act.")
 
     # --- 3. temporal re-grading, synchronous path (#5) -------------------------------------------
     _rule("3. TEMPORAL RE-GRADING (synchronous, in-conversation)")

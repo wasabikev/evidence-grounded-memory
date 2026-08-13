@@ -27,7 +27,7 @@ implementation. It is a *demonstration of the architecture*, not a copy of the p
 | **Temporal authority** | Facts enter *provisional*, then get promoted (`confirmed by …`) or superseded (`superseded … by …`) as evidence accumulates — non-destructively. |
 | **Retrieval** | Dual-path: FTS5 keyword + semantic vector search, run in parallel and **merged**. |
 | **Injection** | Split token budget (shared pool + separate INDEX cap) so no single topic crowds out cross-domain context. |
-| **Source recall** | Held documents are a first-class substrate: a passive per-agent inventory + a derived content index surface a document's text, so the agent recalls and cites primary sources, not just distilled memory. |
+| **Source recall** | Held documents are a first-class substrate, reached the same way topic memory is: an inline `[doc:<ref>]` citation when memory has already drawn on a document, or an explicit content search when it hasn't. *(Earlier versions of this design pushed a standing per-agent inventory into every turn — measured, found redundant with the citation channel and a performance sink, and removed. See §8.)* |
 | **Demo domain** | Home renovation / permitting (spans all 7 tiers: building code → permit guidance → contractor docs → product reviews → homeowner statements → AI inference). |
 
 **Quickstart**
@@ -54,13 +54,14 @@ specific, nameable way.
 | 5 | **Temporal re-grading** (promotion & supersession) | Let a fact's trust evolve as evidence accumulates | Stamping authority once at write time is wrong: a low-tier user statement may later be corroborated by a statute, or contradicted by one. Overwriting destroys the audit trail of *what the agent believed and why it changed*. |
 | 6 | **Scheduled consolidation** | Keep the corpus coherent without manual curation | Left alone, a memory store drifts into duplication, contradiction, and stale confidence. A non-destructive, idempotent, budget-aware pass backstops runtime and re-grades the corpus. |
 | 7 | **Section-level indexing** | Inject just the relevant *section*, not a whole topic | Document-level indexing forces a choice between injecting an entire topic (blows the budget) or nothing. H2-sectioned markdown indexed at section granularity makes budget-aware injection possible. |
-| 8 | **Source-document recall** | Make held documents discoverable and content-searchable, per agent | Holding a document isn't the same as being able to use it: filename-only search misses what's in the body, and the agent can't reach for a source it doesn't know it has. A passive per-agent inventory + a derived content index let the repository surface its own primary sources. |
+| 8 | **Source-document recall** | Make held documents discoverable and content-searchable, per agent | Filename-only search misses what's in a document's body, and an agent can't reach for a source it doesn't know it has. The first fix was a standing per-agent inventory pushed into every turn — but measurement showed it was redundant with the citation channel for cited documents and a performance sink (an O(all documents) index rebuild on the request path). The fix that stuck: content lives one hop from its citation — `[doc:<ref>]` resolves to searchable text — and an uncited-but-relevant document is treated as a gap in *extraction*, not a gap a standing catalog should paper over. |
 | 9 | **Cross-topic backlinks** | Let related facts in different topics know about each other | The obvious fix is a graph database — but the entities already exist (topic routing already solved that); the actual gap is structural. A link recorded as **two independently-written markers**, not one derived from the other, is checkable: the consolidator can catch a marker that's gone missing or content that's drifted since the link was made. A purely derived backlink is consistent by construction and could never detect either. |
 
 **Temporal re-grading (#5)** is where this design departs most from conventional agent memory — it models
 something a vector index leaves out entirely: a fact's standing changing as evidence accumulates. It is
-reinforced by the provenance layer (**#3 / #4**) and by **source-document recall (#8)**, which lets the
-repository surface its own primary sources. The retrieval foundations — **dual-path hybrid search (#1)**
+reinforced by the provenance layer (**#3 / #4**) and by **source-document recall (#8)**, which resolves a
+document's citation to its searchable content on demand — including the discipline of *removing* a
+mechanism once measurement showed it was redundant. The retrieval foundations — **dual-path hybrid search (#1)**
 and **section-level indexing (#7)** — are deliberately *standard* best practices, included because the
 system rests on them, not as novel contributions: hybrid keyword+semantic retrieval is table stakes here,
 and this design treats it as such.
@@ -148,8 +149,7 @@ evidence-grounded-memory/
 │   ├── tiers.py               ← 7-tier / 14-category vocabulary + resolver
 │   └── sources.py             ← sources registry schema + tag parser
 ├── documents/                 ← source-document recall (decision #8)
-│   ├── index.py               ← derived FTS5 index over filename + gist + body
-│   └── inventory.py           ← passive "Source documents" inventory block
+│   └── index.py               ← derived FTS5 index over filename + gist + body
 ├── examples/
 │   └── demo.py                ← end-to-end: ingest → tag → recall → inject
 └── tests/                     ← behavior-demonstrating tests
@@ -180,7 +180,7 @@ for the provenance layer.
 - [x] Semantic index (`semantic_index.py`)
 - [x] Split-budget dual-path injector (`injector.py`)
 - [x] Slim consolidator: dedup + re-tier (`consolidator.py`)
-- [x] Source-document recall: per-agent FTS5 document index + passive inventory (`documents/`)
+- [x] Source-document recall: per-agent FTS5 document index, resolved on demand (`documents/`)
 - [x] Cross-topic backlinks: double-entry link rendering + reconciliation (`backlinks.py`)
 - [x] End-to-end demo (`examples/demo.py`) + tests
 - [ ] **Next:** entity resolution (knowing two mentions name the same thing); a stronger ingestion gate so the foundation can absorb high-volume, low-signal sources without polluting memory

@@ -75,9 +75,9 @@ call, within a fixed, partitioned token budget.
 **Scheduled consolidation.** Because authority is temporal, a scheduled pass re-grades the corpus over
 time — promoting corroborated facts, marking superseded ones, deduplicating, and keeping tiers honest.
 
-**Source-document recall.** Held documents are a second substrate alongside topic memory: a passive
-per-agent inventory plus a derived content index make a document's text discoverable and recallable, so the
-repository can surface its own primary sources.
+**Source-document recall.** Held documents are a second substrate alongside topic memory: a derived content
+index makes a document's text discoverable and recallable, resolved the same way topic memory is — an
+inline citation when it's already been cited, an explicit search when it hasn't.
 
 **Cross-topic backlinks.** A link between two topic sections is recorded as two independently-written
 markers, not one derived from the other — so the consolidator can reconcile them and catch drift, the
@@ -241,27 +241,29 @@ mechanism that makes decision #2 possible.
 ### 8. Source-document recall
 
 Held documents (uploaded files) are a second knowledge substrate alongside topic memory: where topics hold
-*distilled* knowledge, documents hold *primary-source* knowledge. Two ideas make them usable — and they are
-what this decision is about, **not** the retrieval technology, which is the same standard FTS5 as #1:
+*distilled* knowledge, documents hold *primary-source* knowledge. The design that shipped first here was a
+standing per-agent inventory, pushed into every turn — "discovery as a structural invariant, not a tool the
+agent must remember to call." It was the obvious fix for the production failure that motivated this
+decision (filename-only matching missed answers that lived in a document's body), and it worked. Then two
+things showed up under measurement: for any document a topic memory had already cited, the standing catalog
+was telling the agent nothing the `[doc:<ref>]` citation hadn't already surfaced inline — and the catalog's
+per-turn index rebuild was expensive enough, at real corpus size, to starve the retrieval tiers running
+after it. **The fix was to remove the standing catalog, not to make it faster.** Documents are now reached
+the way the citation channel already implied they should be: a `[doc:<ref>]` reference resolves to
+recallable content on demand, backed by the same derived FTS5 index the catalog used to rebuild eagerly —
+now built lazily, off any per-turn path.
 
-- **Passive discovery as a structural invariant.** A per-agent inventory of held documents is surfaced in
-  context every turn, so the agent is *told what sources it has* rather than having to remember to search.
-  The production failure this fixes was filename-only matching — a document whose answer lived in its body
-  went unfound because its *name* didn't contain the query terms.
-- **Documents as a first-class substrate.** A derived FTS5 index over `filename + gist + body` makes a
-  document's content addressable, and its `[doc:<ref>·<tier>]` citation (#4) resolves to recallable text,
-  not just a registry label. The index is per-agent, derived, and disposable — exactly like the topic index.
+This is a *build → measure → remove* story, not a retraction. The passive-injection bet was reasonable
+given what was known at ship time; measurement is what made the redundancy and the cost visible, and
+removing an accidental mechanism once it's recognized as accidental is the same discipline the rest of this
+system rests on (see #5 — a fact's standing changes as evidence accumulates; a design's standing can too).
+The one accepted tradeoff: a document relevant to a turn that nothing has cited *yet* is no longer surfaced
+proactively — treated here as a signal that the extraction pipeline should have written a memory about it,
+not a gap a standing catalog should mask.
 
-The demo shows **discovery feeding re-grading**: a content query surfaces the contractor quote a filename
-search misses, and that same document then drives the supersession in #5 (remove the discovery step and the
-re-grading has no source to cite). The runnable demo is single-tenant; **per-agent isolation** — one index
-per agent, so a document never surfaces for an agent that doesn't own it — is a production property
-described here but not exercised by the demo (it's an assertion about deployment, not an algorithm).
-
-> *Reference scope:* the index and inventory run in the neutral domain. Document text is committed directly
-> (in production it comes from OCR); the gist is authored (in production a utility model generates it,
-> mirroring `ai_summary`); and the `possibly related` overlap threshold, budget figures, and ranking
-> weights are withheld calibration.
+> *Reference scope:* the FTS5 index and search primitive are unchanged from the original design — only the
+> trigger moved, from an ambient per-turn scan to an explicit query. Per-agent isolation remains a described
+> production property, not exercised by this single-tenant demo, same as the original #8 narrative.
 
 ### 9. Cross-topic backlinks
 
@@ -328,7 +330,7 @@ A reference implementation should *demonstrate* each decision, not ship the prod
 | 5 | Temporal re-grading | The concept, annotation format, the two-trigger design | Production reconciliation prompts + promotion/supersession heuristics + thresholds | **High** |
 | 6 | Scheduled consolidation | The slim dedup + re-tier loop; non-destructive / idempotent / budget-aware principles | Production merge prompts + LLM-judgment heuristics; the full sub-task set | Med |
 | 7 | Section-level indexing | Fully — standard technique, no calibration to protect | — | Low |
-| 8 | Source-document recall | Passive inventory + derived content-index mechanism; discovery-as-invariant + the document substrate | Budget figures, the `possibly related` overlap threshold, ranking weights; per-agent isolation is described-only | Low |
+| 8 | Source-document recall | Content-index + on-demand citation resolution; discovery-as-invariant reframed as resolve-on-demand; the removed standing-inventory mechanism, described as a measured-and-reversed design choice | Per-agent isolation is described-only | Low |
 | 9 | Cross-topic backlinks | Fully — the double-entry mechanism, marker rendering, and reconciliation are all structural, no calibration to protect | Detection itself stays an LLM judgment call (described-only, demo uses a fixture); reorg-driven marker rewrite is described-only, same as topic-reorg | Low |
 
 The two **High** rows (#3 cue table, #5 mechanism) are where "are we publishing too much?" actually
